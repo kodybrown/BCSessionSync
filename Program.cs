@@ -12,11 +12,17 @@ using YamlDotNet.Serialization;
 class Program
 {
   private static readonly string _settingsFile = "backup-settings.yaml";
-
   private static readonly Lock _logLock = new();
 
-  private static string _bcSessionsFile = "";
+  private static string? _bcSessionsFile;
   private static List<SyncGroup> _syncGroups = [];
+
+  // FileSystemWatcher and timer for monitoring
+  private static FileSystemWatcher? _fileWatcher;
+  private static System.Timers.Timer? _debounceTimer;
+
+  // Prevent triggering the file watcher from our own writes
+  private static bool _monitoringIsPaused = false;
 
   static async Task Main( string[] args )
   {
@@ -32,20 +38,45 @@ class Program
       }
 
       // Check if BCSessions.xml exists
-      if (!File.Exists(_bcSessionsFile)) {
+      if (!File.Exists(_bcSessionsFile!)) {
         Console.WriteLine($"Error: BCSessions.xml not found at {_bcSessionsFile}");
         Console.WriteLine("Please ensure Beyond Compare is installed and sessions exist.");
         return;
       }
 
-      // Run sync operation
+      // Check for --monitor flag to enable background monitoring
+      var monitorMode = args.Contains("--monitor", StringComparer.OrdinalIgnoreCase);
+
+      if (monitorMode) {
+        StartBackgroundMonitoring();
+
+        Console.WriteLine("\n========================================");
+        Console.WriteLine("  Monitoring BCSessions.xml for changes...");
+        Console.WriteLine("  Press Enter to exit, or Ctrl+C");
+        Console.WriteLine("========================================\n");
+
+        // Wait for user input (keeps app running)
+        while (!Console.KeyAvailable) {
+          await Task.Delay(100);
+        }
+
+        var key = Console.ReadKey(intercept: true).Key;
+        if (key == ConsoleKey.Enter || key == ConsoleKey.C) {
+          StopMonitoring();
+          Console.WriteLine("\nStopping monitoring...");
+          LogInfo("User stopped the application");
+        }
+      }
+
+      // Run initial sync (always runs, regardless of monitor mode)
       await SyncAllGroupsAsync();
 
-      Console.WriteLine("\n========================================");
-      Console.WriteLine("  Sync complete. Press any key to exit...");
-      Console.WriteLine("========================================");
-
-      Console.ReadKey();
+      if (!monitorMode) {
+        Console.WriteLine("\n========================================");
+        Console.WriteLine("  Sync complete. Press any key to exit...");
+        Console.WriteLine("========================================");
+        Console.ReadKey();
+      }
     } catch (Exception ex) {
       LogError($"Fatal error: {ex.Message}");
       Console.WriteLine($"\nError: {ex.Message}");
@@ -82,9 +113,99 @@ class Program
     }
   }
 
+  static void StartBackgroundMonitoring()
+  {
+    try {
+      var dir = Path.GetDirectoryName(_bcSessionsFile!)!;
+      var fileName = Path.GetFileName(_bcSessionsFile!);
+
+      _fileWatcher = new FileSystemWatcher(dir, fileName) {
+        NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size,
+        EnableRaisingEvents = true
+      };
+
+      _monitoringIsPaused = false;
+
+      _fileWatcher.Changed += OnBcSessionsChanged;
+      _fileWatcher.Error += OnFileWatcherError;
+
+      // Create debounce timer (wait 3 seconds after change before syncing)
+      _debounceTimer = new System.Timers.Timer(3000);
+      _debounceTimer.Elapsed += OnDebounceElapsed;
+      _debounceTimer.AutoReset = false;
+
+      LogInfo($"Started monitoring: {_bcSessionsFile}");
+    } catch (Exception ex) {
+      LogError($"Failed to start file watcher: {ex.Message}");
+    }
+  }
+
+  static void StopMonitoring()
+  {
+    try {
+      _debounceTimer?.Stop();
+      _fileWatcher?.Dispose();
+      _debounceTimer?.Dispose();
+
+      _fileWatcher = null;
+      _debounceTimer = null;
+    } catch (Exception ex) {
+      LogError($"Failed to stop file watcher: {ex.Message}");
+    }
+  }
+
+  static void OnBcSessionsChanged( object sender, FileSystemEventArgs e )
+  {
+    if (_monitoringIsPaused) {
+      return;
+    }
+
+    // Debounce rapid changes - only sync after 3 seconds of no activity
+    _debounceTimer?.Start();
+    LogInfo($"BCSessions.xml changed. Waiting for changes to settle...");
+  }
+
+  static async void OnDebounceElapsed( object? sender, System.Timers.ElapsedEventArgs e )
+  {
+    if (_monitoringIsPaused) {
+      return;
+    }
+
+    // Check if file is locked by Beyond Compare
+    if (IsFileLocked(_bcSessionsFile!)) {
+      LogWarning("BCSessions.xml is currently locked. Retrying after 2 seconds...");
+      await Task.Delay(2000);
+
+      if (!IsFileLocked(_bcSessionsFile!)) {
+        _ = SyncAllGroupsAsync(); // Fire and forget - errors handled in method
+      } else {
+        LogError("BCSessions.xml is still locked. Skipping sync.");
+      }
+    } else {
+      await SyncAllGroupsAsync();
+    }
+  }
+
+  static void OnFileWatcherError( object? sender, ErrorEventArgs e )
+  {
+    if (e.GetException() != null) {
+      LogError($"File watcher error: {e.GetException().Message}");
+    }
+  }
+
+  static bool IsFileLocked( string path )
+  {
+    try {
+      using var stream = File.Open(path, FileMode.Open, FileAccess.ReadWrite);
+      return false; // Not locked
+    } catch (IOException) {
+      return true; // Locked by another process
+    }
+  }
+
   static async Task SyncAllGroupsAsync()
   {
-    var xmlContent = await File.ReadAllTextAsync(_bcSessionsFile);
+    var xmlContent = await File.ReadAllTextAsync(_bcSessionsFile!);
     var doc = new XmlDocument();
     doc.LoadXml(xmlContent);
 
@@ -107,8 +228,22 @@ class Program
       doc.Save(writer);
     }
 
-    await File.WriteAllTextAsync(_bcSessionsFile, sb.ToString());
+    PauseMonitoring();
+
+    await File.WriteAllTextAsync(_bcSessionsFile!, sb.ToString());
     LogInfo("BCSessions.xml saved successfully");
+
+    UnPauseMonitoring();
+  }
+
+  private static void PauseMonitoring()
+  {
+    _monitoringIsPaused = true;
+  }
+
+  private static void UnPauseMonitoring()
+  {
+    _monitoringIsPaused = false;
   }
 
   static List<SessionInfo> FindAllSessions( XmlNode? node )
