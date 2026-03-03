@@ -1,0 +1,42 @@
+# See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+
+
+# System files
+**/.DS_Store
+**/[Tt]humbs.db
+**/[Dd]esktop.ini
+
+# Visual Studio
+**/.vs/
+**/[Bb]in/
+**/[Oo]bj/
+**/*.suo
+**/*.user
+
+# Visual Studio Code
+# **/.vscode/*
+# **/!.vscode/extensions.json
+# **/!.vscode/launch.json
+# **/!.vscode/settings.json
+# **/!.vscode/tasks.json
+**/.history/*
+
+# Test tools
+**/coverage/
+
+# Angular
+**/.angular/cache/
+**/typings/
+
+# Node
+**/node_modules/
+**/npm-debug.log*
+
+# Compiled output
+**/dist/
+**/tmp/
+**/.sass-cache/
+
+# Logs
+**/logs/
+**/*.log

@@ -1,0 +1,18 @@
+# Set default behaviors to automatically normalize line endings.
+# ===========================================================================
+# Handle line endings automatically for files detected as text
+# and leave all files detected as binary untouched.
+# This will handle all files NOT explicitly defined below.
+
+# Hybrid: This will check in as LF, but checkout matching the OS.
+* text=auto
+# Force NATIVE line-endings. (ie: crlf on Windows, lf on Linux, etc.)
+# * text
+# Explicitly declare all files to always have specific line-endings.
+# * text eol=lf
+
+# Force CRLF line-endings.
+*.bat      eol=crlf
+*.BAT      eol=crlf
+*.cmd      eol=crlf
+*.CMD      eol=crlf

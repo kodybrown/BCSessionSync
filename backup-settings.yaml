@@ -1,0 +1,12 @@
+# BCSessionSync Configuration File
+# Define sync groups by their keyword (appears anywhere in session name)
+
+sync_groups:
+  - keyword: 'userprofile_sync'
+    name: 'User Profile Sync'
+    
+  - keyword: 'scoop_sync'
+    name: 'Scoop Sync'
+
+# Beyond Compare sessions file location
+bc_sessions_file: 'C:\Users\kodyb\AppData\Roaming\Scooter Software\Beyond Compare 5\BCSessions.xml'
