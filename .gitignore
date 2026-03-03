@@ -1,5 +1,10 @@
 # See https://docs.github.com/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
 
+# Project-specific ignores
+**/.code_compare
+**/.ground_zero
+**/notes.md
+publish/
 
 # System files
 **/.DS_Store
@@ -12,14 +17,6 @@
 **/[Oo]bj/
 **/*.suo
 **/*.user
-
-# Visual Studio Code
-# **/.vscode/*
-# **/!.vscode/extensions.json
-# **/!.vscode/launch.json
-# **/!.vscode/settings.json
-# **/!.vscode/tasks.json
-**/.history/*
 
 # Test tools
 **/coverage/

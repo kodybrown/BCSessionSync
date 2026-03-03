@@ -6,30 +6,60 @@ A simple console application that synchronizes Beyond Compare session settings a
 
 This tool monitors your `BCSessions.xml` file and automatically synchronizes session properties (Filters, Rules, State) between all sessions that share a common sync keyword in their name.
 
-## Features
-
-- **Group-based synchronization**: Sessions are grouped by keywords found anywhere in their name
-- **Timestamp-based change detection**: Only syncs when timestamps differ within a group
-- **Source of truth**: Uses the most recently modified session as the source for all others
-- **Preserves exclusions**: All exclusion patterns (including `#EXCLUDED-*` prefixes) are copied as-is
-- **Logging**: All operations are logged to timestamped log files
-
 ## Installation
 
-1. Build the project:
-   ```bash
+1. Navigate to the project directory:
+   ```powershell
+   cd C:\Users\kodyb\WasatchWizard\BCSessionSync
+   ```
+
+2. Restore dependencies and build:
+   ```powershell
+   dotnet restore
    dotnet build
    ```
 
-2. Run the application:
-   ```bash
-   dotnet run
+3. Run manually (one-time sync):
+   ```powershell
+   dotnet run --no-build
    ```
 
-3. Or publish for standalone use:
-   ```bash
-   dotnet publish -c Release -r win-x64 --self-contained true
+4. Or publish for standalone use:
+   ```powershell
+   dotnet publish -c Release -r win-x64 --self-contained true -o ./publish/win-x64
    ```
+
+## Usage
+
+### One-Time Sync (Default)
+
+Run the app to perform a single sync operation and exit:
+
+```powershell
+cd C:\Users\kodyb\WasatchWizard\BCSessionSync
+dotnet run --no-build
+```
+
+The app will:
+1. Load settings from `backup-settings.yaml`
+2. Scan all sessions in BCSessions.xml
+3. Synchronize groups where timestamps differ
+4. Exit automatically
+
+### Continuous Monitoring Mode
+
+Run the app to monitor BCSessions.xml for changes and sync automatically:
+
+```powershell
+cd C:\Users\kodyb\WasatchWizard\BCSessionSync
+dotnet run --no-build --monitor
+```
+
+The app will:
+1. Start monitoring `BCSessions.xml` in real-time
+2. Sync all groups whenever a change is detected (after 3-second debounce)
+3. Handle file locks gracefully (retries if Beyond Compare has the file open)
+4. Wait for you to press Enter or Ctrl+C to exit
 
 ## Configuration
 
@@ -37,40 +67,36 @@ Edit `backup-settings.yaml` to define your sync groups:
 
 ```yaml
 sync_groups:
-  - keyword: 'userprofile_sync'
+  - keyword: '[~]'
     name: 'User Profile Sync'
     
-  - keyword: 'scoop_sync'
+  - keyword: '[scoop]'
     name: 'Scoop Sync'
+    
+  - keyword: '[comp]'
+    name: 'Computer Sync'
 
 bc_sessions_file: 'C:\Users\kodyb\AppData\Roaming\Scooter Software\Beyond Compare 5\BCSessions.xml'
 ```
 
-## Session Naming Convention
+### Session Naming Convention
 
 Sessions should include the sync keyword anywhere in their name. Examples:
 
-- `1 Personal :: (userprofile_sync) (personal_1t)`
-- `2 Nomad :: userprofile_sync nomad_4tb`
-- `[~] 3 Hermit :: [userprofile_sync] hermit_8tb`
+- `1 Personal :: [~] (personal_1t)`
+- `2 Nomad :: [scoop] nomad_4tb`
+- `[~] 3 Hermit :: [comp] hermit_8tb`
 
 All sessions containing the same keyword will be synchronized together.
 
 ## How It Works
 
-1. **Load Settings**: Reads sync groups from `backup-settings.yaml`
-2. **Parse Sessions**: Recursively finds all `TDirCompareSession` elements in BCSessions.xml
-3. **Group Sessions**: Groups sessions by their sync keywords
-4. **Detect Changes**: Compares `LastModified` timestamps within each group
-5. **Sync if Needed**: If timestamps differ, copies properties from newest session to others
-6. **Save Changes**: Writes updated XML back to BCSessions.xml
-
-## Sync Logic
+### Sync Logic
 
 For each sync group:
-- If only 1 session exists → Skip (nothing to sync with)
-- If all timestamps match → Skip (no changes detected)
-- If timestamps differ → Use newest as source, update all others
+1. If only 1 session exists → Skip (nothing to sync with)
+2. If all timestamps match → Skip (no changes detected)
+3. If timestamps differ → Use newest as source, update all others
 
 Properties synchronized:
 - `LastModified` timestamp
@@ -78,11 +104,21 @@ Properties synchronized:
 - `Rules` element
 - `State` element
 
+### Real-Time Monitoring
+
+When monitoring mode is enabled (`--monitor`):
+1. FileSystemWatcher monitors BCSessions.xml for changes
+2. On change detected → debounce timer starts (3 seconds)
+3. After 3 seconds of no activity:
+   - If file locked by Beyond Compare → wait 2 more seconds and retry
+   - If unlocked → perform sync automatically
+
 ## Logging
 
 All operations are logged to `logs/sync_YYYYMMDD.log`:
 
 ```
+[2026-03-02 17:45:23.456] [INFO] Started monitoring: C:\Users\kodyb\AppData\Roaming\Scooter Software\Beyond Compare 5\BCSessions.xml
 [2026-03-02 17:45:23.456] [INFO] Synced: 'Personal 1TB (userprofile_sync) (personal_1t)' <- 'Nomad (userprofile_sync) (nomad_4tb)'
 ```
 
@@ -100,13 +136,17 @@ All operations are logged to `logs/sync_YYYYMMDD.log`:
 - This is normal when no changes have been made since last sync
 - The app correctly detected that nothing needs updating
 
+### File Locked Error (in monitoring mode)
+- Beyond Compare may have BCSessions.xml open while running
+- App will automatically retry after 2 seconds
+- If file remains locked for extended period, check if Beyond Compare is still editing sessions
+
 ## Future Enhancements (v2)
 
-- Automatic creation of missing destination sessions
 - Destination-specific exclusion management via `#EXCLUDED-*` prefixes
-- Background monitoring with FileSystemWatcher
 - System tray icon for quick access
 - Dry-run mode to preview changes before applying
+- Automatic creation of missing destination sessions
 
 ## License
 

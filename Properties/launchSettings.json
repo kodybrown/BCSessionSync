@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "BCSessionSync": {
+      "commandName": "Project",
+      "commandLineArgs": "--monitor"
+    }
+  }
+}

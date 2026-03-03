@@ -3,14 +3,24 @@
 # Make this the top-most EditorConfig file.
 root = true
 
+#
+# Format the entire solution (PREFERRED):
+#
+#     dotnet format -v d Solution.slnx
+#
+# Or, you can format individual projects:
+#
+#     dotnet format -v d src/Project.csproj
+#
+
 ###################################
 #   All files                     #
 ###################################
 
 [*]
 charset = utf-8       # latin1|utf-8|utf-8-bom|utf-16|utf-16be|utf-16le|utf-32|unset
-end_of_line = lf      # lf|cr|crlf
-file_header_template = unset
+#end_of_line = lf      # lf|cr|crlf
+#file_header_template = unset
 #indent_size = 2       # Don't specify an indent_size here; that has too many unintended consequences.
 #indent_style = space  # space|tab
 insert_final_newline = true
@@ -23,31 +33,26 @@ trim_trailing_whitespace = true
 
 # Visual Studio files
 [*.sln]
-end_of_line = lf
+#end_of_line = lf
 indent_size = 2
 tab_width = 2
 indent_style = space
 
 [*.csproj]
-end_of_line = lf
+#end_of_line = lf
 indent_size = 2
 tab_width = 2
 indent_style = space
 
-[*.{md,markdown}]
-end_of_line = lf
-indent_size = 2
-tab_width = 2
-
 # Script files
 [*.{bat,cmd}]
-end_of_line = lf
+end_of_line = crlf
 indent_size = 2
 tab_width = 2
 indent_style = space
 
 [*.{ps1,psm1}]
-end_of_line = lf
+#end_of_line = lf
 indent_size = 2
 tab_width = 2
 indent_style = space
@@ -60,26 +65,26 @@ indent_style = space
 
 # Web files
 [*.{htm,html}]
-end_of_line = lf
+#end_of_line = lf
 indent_size = 2
 tab_width = 2
 indent_style = space
 
 [*.{css,scss}]
-end_of_line = lf
+#end_of_line = lf
 indent_size = 2
 tab_width = 2
 indent_style = space
 
 [*.js]
-end_of_line = lf
+#end_of_line = lf
 indent_size = 2
 tab_width = 2
 indent_style = space
 quote_type = single
 
 [*.ts]
-end_of_line = lf
+#end_of_line = lf
 indent_size = 2
 tab_width = 2
 indent_style = space
@@ -88,7 +93,7 @@ ij_typescript_use_double_quotes = false
 
 # JSON files
 [*.{json,jsonc}]
-end_of_line = lf
+#end_of_line = lf
 indent_size = 2
 tab_width = 2
 indent_style = space
@@ -96,7 +101,7 @@ indent_style = space
 # Markdown files
 [*.{md,markdown}]
 max_line_length = off
-end_of_line = lf
+#end_of_line = lf
 indent_size = 2
 tab_width = 2
 indent_style = space
@@ -107,7 +112,7 @@ indent_style = space
 ###################################
 
 [*.cs]
-end_of_line = lf
+#end_of_line = lf
 file_header_template = unset
 indent_size = 2
 indent_style = space
@@ -291,13 +296,3 @@ dotnet_naming_symbols.property.required_modifiers =
 dotnet_naming_symbols.types.applicable_accessibilities = public, internal, private, protected, protected_internal, private_protected
 dotnet_naming_symbols.types.applicable_kinds = class, struct, interface, enum
 dotnet_naming_symbols.types.required_modifiers =
-
-#
-# Format the entire solution (PREFERRED):
-#
-#     dotnet format -v d Cloud.sln
-#
-# Or, you can format individual projects:
-#
-#     dotnet format -v d ApiServer/ApiServer/ApiServer.csproj
-#
