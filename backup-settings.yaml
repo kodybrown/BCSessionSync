@@ -2,11 +2,17 @@
 # Define sync groups by their keyword (appears anywhere in session name)
 
 sync_groups:
-  - keyword: 'userprofile_sync'
+  - keyword: '[~]'
     name: 'User Profile Sync'
     
-  - keyword: 'scoop_sync'
+  - keyword: '[scoop]'
     name: 'Scoop Sync'
 
+  - keyword: '[comp]'
+    name: 'Computer Sync (over the network)'
+
+  - keyword: 'burn_to_disk'
+    name: 'Burn to Disk Sync'
+
 # Beyond Compare sessions file location
-bc_sessions_file: 'C:\Users\kodyb\AppData\Roaming\Scooter Software\Beyond Compare 5\BCSessions.xml'
+bc_sessions_file: '${env:AppData}\Scooter Software\Beyond Compare 5\BCSessions.xml'

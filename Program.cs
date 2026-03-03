@@ -97,8 +97,19 @@ class Program
       var deserializer = new DeserializerBuilder().Build();
       var settings = deserializer.Deserialize<Settings>(yaml);
 
-      _syncGroups = settings.SyncGroups ?? [];
-      _bcSessionsFile = settings.BCSessionsFile;
+      _syncGroups = new List<SyncGroup>(settings.SyncGroups.Count);
+      foreach (var group in settings.SyncGroups) {
+        if (string.IsNullOrWhiteSpace(group.Keyword)) {
+          LogWarning($"Skipping sync group with empty keyword: '{group.Name}'");
+          continue;
+        }
+        _syncGroups.Add(new SyncGroup {
+          Name = ExpandEnvars(group.Name),
+          Keyword = ExpandEnvars(group.Keyword)
+        });
+      }
+
+      _bcSessionsFile = ExpandEnvars(settings.BCSessionsFile);
 
       Console.WriteLine($"Loaded {_syncGroups.Count} sync groups:");
       foreach (var group in _syncGroups) {
@@ -111,6 +122,99 @@ class Program
       LogError($"Failed to load settings: {ex.Message}");
       return false;
     }
+  }
+
+  private static readonly Dictionary<string, string> _envarCache = Environment.GetEnvironmentVariables()
+                                                                              .Cast<System.Collections.DictionaryEntry>()
+                                                                              .ToDictionary(k => (string)k.Key!, v => (string)v.Value!);
+
+  static string ExpandEnvars( string text )
+  {
+    if (string.IsNullOrWhiteSpace(text)) {
+      return text;
+    }
+
+    while (true) {
+      if (text.Contains('%')) {
+        // Support '%VAR%' syntax
+        foreach (var (key, value) in _envarCache) {
+          var placeholder = $"%{key}%";
+          if (text.Contains(placeholder, StringComparison.OrdinalIgnoreCase)) {
+            text = text.Replace(placeholder, value, StringComparison.OrdinalIgnoreCase);
+            continue;
+          }
+        }
+        // If we found a '%' but couldn't replace it, it means the variable is missing?
+        if (text.Contains('%')) {
+          var start = text.IndexOf('%');
+          var end = text.IndexOf('%', start + 1);
+          if (start >= 0 && end > start) {
+            var key = text.Substring(start + 1, end - start - 1);
+            LogException(new Exception($"Environment variable '%{key}%' specified in '{text}', does not exist."));
+          }
+        }
+      }
+      if (text.Contains("$(")) {
+        // Support '$(VAR)' syntax
+        foreach (var kvp in _envarCache) {
+          var placeholder = $"$({kvp.Key})";
+          if (text.Contains(placeholder, StringComparison.OrdinalIgnoreCase)) {
+            text = text.Replace(placeholder, kvp.Value, StringComparison.OrdinalIgnoreCase);
+            continue;
+          }
+        }
+        // If we found a '$(' but couldn't replace it, it means the variable is missing?
+        if (text.Contains("$(")) {
+          var start = text.IndexOf("$(");
+          var end = text.IndexOf(')', start + 2);
+          if (start >= 0 && end > start) {
+            var key = text.Substring(start + 2, end - start - 2);
+            LogException(new Exception($"Environment variable '$({key})' specified in '{text}', does not exist."));
+          }
+        }
+      }
+      if (text.Contains("${env:")) {
+        // Support '${env:VAR}' syntax
+        foreach (var kvp in _envarCache) {
+          var placeholder = $"${{env:{kvp.Key}}}";
+          if (text.Contains(placeholder, StringComparison.OrdinalIgnoreCase)) {
+            text = text.Replace(placeholder, kvp.Value, StringComparison.OrdinalIgnoreCase);
+            continue;
+          }
+        }
+        // If we found a '${env:' but couldn't replace it, it means the variable is missing?
+        if (text.Contains("${env:")) {
+          var start = text.IndexOf("${env:");
+          var end = text.IndexOf('}', start + 6);
+          if (start >= 0 && end > start) {
+            var key = text.Substring(start + 6, end - start - 6);
+            LogException(new Exception($"Environment variable '${{env:{key}}}' specified in '{text}', does not exist."));
+          }
+        }
+      }
+      if (text.Contains("${")) {
+        // Support '${VAR}' syntax
+        foreach (var kvp in _envarCache) {
+          var placeholder = $"${{{kvp.Key}}}";
+          if (text.Contains(placeholder, StringComparison.OrdinalIgnoreCase)) {
+            text = text.Replace(placeholder, kvp.Value, StringComparison.OrdinalIgnoreCase);
+            continue;
+          }
+        }
+        // If we found a '${' but couldn't replace it, it means the variable is missing?
+        if (text.Contains("${")) {
+          var start = text.IndexOf("${");
+          var end = text.IndexOf('}', start + 2);
+          if (start >= 0 && end > start) {
+            var key = text.Substring(start + 2, end - start - 2);
+            LogException(new Exception($"Environment variable '${{{key}}}' specified in '{text}', does not exist."));
+          }
+        }
+      }
+      break; // Only reached if something was NOT replaced!
+    }
+
+    return text;
   }
 
   static void StartBackgroundMonitoring()
@@ -402,6 +506,13 @@ class Program
   {
     WriteLog("ERROR", message);
     Console.WriteLine($"[ERROR] {message}");
+  }
+
+  static void LogException( Exception ex, string? message = null )
+  {
+    WriteLog("ERROR", message ?? ex.Message);
+    Console.WriteLine($"[ERROR] {message ?? ex.Message}");
+    throw new Exception(message, ex);
   }
 
   static void WriteLog( string level, string message )
